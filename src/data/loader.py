@@ -84,10 +84,14 @@ class MarketDataLoader:
             group_by='ticker' if len(tickers) > 1 else 'column'
         )
         
-        # Handle single ticker case (flatten MultiIndex)
-        if len(tickers) == 1:
-            data.columns = data.columns
-        
+        # yfinance >= 0.2 always returns a MultiIndex (Price, Ticker).
+        # Flatten it for single-ticker fetches so callers get plain column names.
+        if isinstance(data.columns, pd.MultiIndex):
+            if len(tickers) == 1:
+                # Drop the ticker level → columns become ['Close', 'Open', ...]
+                data.columns = data.columns.droplevel('Ticker')
+            # For multi-ticker keep the MultiIndex as-is
+
         # Basic validation
         if data.empty:
             raise ValueError(f"No data fetched for {tickers}. Check ticker symbols and date range.")
@@ -99,7 +103,7 @@ class MarketDataLoader:
             data.to_csv(filepath)
             print(f"Data saved to {filepath}")
         
-        print(f"✓ Fetched {len(data)} rows of data")
+        print(f"OK: Fetched {len(data)} rows of data")
         return data
     
     def load_from_disk(self, filename: str) -> pd.DataFrame:
@@ -118,7 +122,7 @@ class MarketDataLoader:
             raise FileNotFoundError(f"File not found: {filepath}")
         
         data = pd.read_csv(filepath, index_col=0, parse_dates=True)
-        print(f"✓ Loaded {len(data)} rows from {filepath}")
+        print(f"OK: Loaded {len(data)} rows from {filepath}")
         return data
     
     def get_price_series(
